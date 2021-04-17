@@ -8,18 +8,116 @@ output:
 
 ## Loading and preprocessing the data
 
+The first step is to unzip the file, then to read it using the function **read.csv**. We notice that the date column is of character format, thus we transform it into date format. 
+
+```{r, echo=TRUE}
+if (!file.exists("activity")) { 
+        unzip("activity.zip")}
+activity<-read.csv("activity.csv")
+summary(activity)
+activity$date <- as.Date(activity$date, "%Y-%m-%d")
+summary(activity)
+
+```
 
 
 ## What is mean total number of steps taken per day?
 
+To answer this question we plot a histogram showing the total numbers of daily steps.
 
+```{r, echo=TRUE}
+daily_activity <- aggregate(activity$steps, by=list(activity$date), FUN= sum, na.rm=TRUE)
+names(daily_activity) <- c("date","steps")
+
+hist(daily_activity$steps, breaks=10 , col="lightblue", main="The total number of daily steps", xlab = "Total  daily steps", ylab="Number of days")
+abline(v=mean(daily_activity$steps), col="red", lwd = 2)
+abline(v=median(daily_activity$steps), col="green", lwd = 2)
+
+mean(daily_activity$steps)
+median(daily_activity$steps)
+
+```
+
+The histogram above shows the total number of steps taken each day, one can see that the histogram doesn't follow any widely known distribution, although it is most similar to a normal distribution. We added the mean and the median to the plot, this shows that the mean which is equal to `r round(mean(daily_activity$steps),2) ` is smaller than the median which is equal to `r median(daily_activity$steps) `, therefore while the individual was taking minimum `r median(daily_activity$steps) ` half of the days, the average of daily steps throughout this study `r round(mean(daily_activity$steps),2) ` is still smaller. In other words, when the individual was not walking up to `r median(daily_activity$steps) ` steps, they were taking much less steps in general.
 
 ## What is the average daily activity pattern?
 
+After our initial idea of the daily steps, our next interest is the average distribution throughout the day, the following plot illustrates this average per 5 minute interval. 
 
+```{r, echo=TRUE}
+
+average_daily_activity <- aggregate(activity$steps, by=list(activity$interval), FUN=mean, na.rm=TRUE)
+names(average_daily_activity) <- c("interval", "average_steps")
+
+plot(average_steps ~ interval, data=  average_daily_activity , main="The average number of steps per 5 min interval", ylab = "Average steps", xlab="Interval", type="l", col="maroon")
+```
+
+The histogram above displays the average number of steps taken, averaged across all days, per 5 minute interval. It shows fluctuations throughout the day, but it is clear that some fluctuations are so small that one can assume the normal sleeping hours of this individual. We are interested in the highest active interval also which is `r average_daily_activity[which.max(average_daily_activity$average_steps),]$interval` calculated by:
+
+```{r, echo=TRUE}
+average_daily_activity[which.max(average_daily_activity$average_steps),]$interval
+
+```
 
 ## Imputing missing values
 
+ALl of our analysis for now does not include missing values, let's start by finding how many missing values there is. 
 
+```{r, echo=TRUE}
+sum(is.na(activity$steps))
+```
+
+Let’s use a simple strategy : we’ll fill in all the missing values in the data set with the mean of all steps measured. 
+
+```{r, echo=TRUE}
+na_index <- is.na(activity$steps)
+activity_na_removed <- activity
+activity_na_removed[na_index,1]<-mean(activity$steps, na.rm = TRUE)
+```
+
+Now, to see the impact of the missing value we plot a similar histogram to the one reporting the daily activity.
+
+```{r, echo=TRUE}
+daily_activity_na_removed <- aggregate(activity_na_removed$steps, by=list(activity$date), FUN= sum, na.rm=TRUE)
+names(daily_activity_na_removed) <- c("date","steps")
+
+hist(daily_activity_na_removed$steps, breaks=10 , col="lightblue", main="The total number of daily steps", xlab = "Total  daily steps", ylab="Number of days")
+abline(v=mean(daily_activity_na_removed$steps), col="red", lwd = 2, lty=1)
+abline(v=median(daily_activity_na_removed$steps), col="green", lwd = 2,lty=2)
+
+mean(daily_activity_na_removed$steps)
+median(daily_activity_na_removed$steps)
+```
+
+The first thing one can notice is that the distribution looks more like a normal distribution in this case. The other notable thing is that the mean and the median are equal and both increased to be `r format(round(mean(daily_activity_na_removed$steps),2))`.
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+To try to figure this out, we begin with adding a factor to determine if the day falls on a weekday or a weekend.
+
+```{r, echo=TRUE}
+activity_na_removed$day <- weekdays(activity_na_removed$date)
+for (i in 1:nrow(activity_na_removed)){
+        if (activity_na_removed[i,]$day %in% c("Saturday","Sunday")){
+                activity_na_removed[i,]$day <- "weekend"}
+        else {activity_na_removed[i,]$day <- "weekday"}
+        
+}
+```
+
+Our next step is to plot the 5-minute interval and the average number of steps taken, averaged across all days for weekdays and for the weekend.
+
+```{r, echo=TRUE}
+
+average_weekly_activity <- aggregate(activity_na_removed$steps, by=list(activity_na_removed$interval, activity_na_removed$day), FUN=mean)
+names(average_weekly_activity) <- c("interval", "day", "average_steps")
+
+library(ggplot2)
+g <- ggplot(average_weekly_activity, aes(x = interval , y = average_steps, color = day)) +
+     geom_line(col="maroon") +
+     labs(title = "Average steps by the type of day per 5 min interval", x = "Interval", y = "Average steps") +
+     facet_wrap(~day, ncol = 1, nrow=2)
+g
+```
+
+The plot above shows a definite difference between weekdays and weekends, however patterns can not be concluded by the information above, for it is not enough. But one has the impression that steps taken by this individual are fluctuating less byt more severely during the weekday compared to the weekend.
